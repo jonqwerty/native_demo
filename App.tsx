@@ -1,118 +1,111 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
-
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
-
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
-
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
-
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
+import React, {useEffect, useMemo, useState} from 'react';
+// import Entypo from 'react-native-vector-icons/Entypo';
+import {Dimensions, SafeAreaView, StyleSheet, Text, View} from 'react-native';
+import {KeyEventListener} from './NativeModules/KeyEvent/KeyEvent';
+import {EventAction} from './NativeModules/KeyEvent/types';
+import {VolumeKeys} from './NativeModules/KeyEvent/keyMapping';
+import {Brightness} from './NativeModules/Brightness/Brightness';
 
 function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+  const [barHeight, setBarHeight] = useState(10);
+  const [currentBrightness, setCurrentBrightness] = useState(0);
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
-  };
+  const memoStyles = useMemo(() => styles(barHeight), [barHeight]);
+
+  useEffect(() => {
+    (async () => {
+      const level = await Brightness.getBrightnessLevel();
+      const currentBrightness =
+        level < 0 ? 0 : level > 1 ? 1 : Math.round(level * 10);
+      setCurrentBrightness(currentBrightness * 10);
+    })();
+  }, [barHeight]);
+
+  useEffect(() => {
+    KeyEventListener.addListener(EventAction.ACTION_DOWN, ({keyName}) => {
+      if (keyName === VolumeKeys.KEYCODE_VOLUME_UP) {
+        return setBarHeight(prev => {
+          const value = Math.min(prev + 10, 100);
+          Brightness.setBrightnessLevel(value / 100);
+          return value;
+        });
+      }
+
+      if (keyName === VolumeKeys.KEYCODE_VOLUME_DOWN) {
+        return setBarHeight(prev => {
+          const value = Math.max(prev - 10, 0);
+          Brightness.setBrightnessLevel(value / 100);
+          return value;
+        });
+      }
+    });
+
+    return () => {
+      KeyEventListener.removeListener(EventAction.ACTION_DOWN);
+    };
+  }, []);
 
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
+    <SafeAreaView>
+      <View style={memoStyles.container}>
+        <Text style={memoStyles.text}>{currentBrightness + ' %'}</Text>
+        <View style={memoStyles.outer}>
+          <View style={memoStyles.icons}>
+            <Text>TTT</Text>
+            {/* <Entypo name="light-up" size={50} color="black" /> */}
+            {/* <Entypo name="light-down" size={50} color="black" /> */}
+            <Text>BBB</Text>
+          </View>
+          <View style={memoStyles.inner} />
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
+const outerRoundedCorner = 60;
+const innerRoundedCorner = outerRoundedCorner - 5;
+
+const styles = (barHeight: number) =>
+  StyleSheet.create({
+    text: {
+      fontSize: 30,
+      fontWeight: 'bold',
+    },
+    container: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+      height: '100%',
+      gap: 20,
+    },
+    outer: {
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      backgroundColor: 'lightgray',
+      width: Dimensions.get('window').width / 2,
+      height: '80%',
+      borderTopEndRadius: outerRoundedCorner - 5,
+      borderTopStartRadius: outerRoundedCorner - 5,
+      borderBottomRightRadius: outerRoundedCorner - 5,
+      borderBottomLeftRadius: outerRoundedCorner - 5,
+    },
+    icons: {
+      position: 'absolute',
+      zIndex: 1,
+      height: '100%',
+      justifyContent: 'space-between',
+      padding: 20,
+    },
+    inner: {
+      backgroundColor: 'gray',
+      width: Dimensions.get('window').width / 2,
+      height: `${barHeight}%`,
+      borderBottomRightRadius: innerRoundedCorner,
+      borderBottomLeftRadius: innerRoundedCorner,
+      borderTopEndRadius: barHeight > 90 ? innerRoundedCorner : 0,
+      borderTopStartRadius: barHeight > 90 ? innerRoundedCorner : 0,
+    },
+  });
 
 export default App;
